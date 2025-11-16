@@ -1,8 +1,29 @@
+use std::path::PathBuf;
+
 pub struct ComputeRenderer {
+    pub fragment_shader: RenderShaderData,
+    pub uniforms: wgpu::Buffer,
+    pub processing_shader: ComputeShaderData,
+    pub downsample_shader: ComputeShaderData,
+    pub image_path: PathBuf,
+    pub textures: Textures,
+}
+
+pub struct ComputeShaderData {
+    pub pipeline: wgpu::ComputePipeline,
+    pub bind_group: wgpu::BindGroup,
+}
+
+pub struct RenderShaderData {
     pub pipeline: wgpu::RenderPipeline,
     pub bind_group: wgpu::BindGroup,
-    pub compute_bind_group: wgpu::BindGroup,
-    pub uniforms: wgpu::Buffer,
-    pub compute_pipeline: wgpu::ComputePipeline,
-    pub image_size: [u32; 2],
+}
+
+pub struct Textures {
+    pub full_texture: wgpu::Texture,
+    pub input_texture: wgpu::Texture,
+    pub output_texture: wgpu::Texture,
+    #[allow(dead_code)]
+    pub image_size: iced::Size<u32>,
+    pub window_size: iced::Size<u32>,
 }

@@ -1,6 +1,9 @@
 struct Uniforms {
     mouse: vec2<f32>,
-    resolution: vec2<f32>,
+    window_size: vec2<f32>,
+    image_size: vec2<f32>,
+    scroll_delta: f32,
+    _padding: f32,
 };
 
 @group(0)
@@ -46,12 +49,24 @@ struct FragInput {
 @fragment
 fn fs_main(input: FragInput) -> @location(0) vec4<f32> {
     if uniforms.mouse.x >= 0.0 && uniforms.mouse.y >= 0.0 {
-        let dist = distance(input.uv * uniforms.resolution, uniforms.mouse);
-        let min_resolution = min(uniforms.resolution.x, uniforms.resolution.y);
-        let radius = 0.06 * min_resolution;
-        let glow = 1.0 - exp(-pow(dist - radius, 2.0) * 0.01);
-        return textureSample(image, image_sampler, input.uv) * glow;
+        let dist = distance(input.uv * uniforms.window_size, uniforms.mouse);
+        let min_resolution = min(uniforms.window_size.x, uniforms.window_size.y);
+        let radius = 0.1 * min_resolution + uniforms.scroll_delta;
+        let sdf = circle_sdf(input.uv * uniforms.window_size, uniforms.mouse, radius);
+        let glow = 1.0 - smoothstep(0.0, 1.0, 1.0 - sdf / radius);
+        var coords = input.uv;
+        // enlarge the area affected by the glow
+        let mouse_uv = uniforms.mouse / uniforms.window_size;
+        coords = mix(coords, mouse_uv, 1.0 - (0.5 + glow * 0.5));
+        var color = textureSample(image, image_sampler, coords);
+        // color.r = mix(1.0 - color.r, color.r, glow);
+        // color.g = mix(1.0 - color.g, color.g, glow);
+        // color.b = mix(1.0 - color.b, color.b, glow);
+        return color;
     }
     return textureSample(image, image_sampler, input.uv);
-    // return vec4<f32>(input.uv.x, input.uv.y, 1.0 - input.uv.x, 1.0);
+}
+
+fn circle_sdf(p: vec2<f32>, center: vec2<f32>, radius: f32) -> f32 {
+    return length(p - center) - radius;
 }
