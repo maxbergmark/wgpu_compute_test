@@ -6,15 +6,35 @@ var image: texture_2d<f32>;
 @binding(1)
 var output: texture_storage_2d<rgba8unorm, write>;
 
+struct Uniforms {
+    mouse: vec2<f32>,
+    window_size: vec2<f32>,
+    image_size: vec2<f32>,
+    output_size: vec2<f32>,
+    scroll_delta: f32,
+    _padding: f32,
+};
+
+@group(0)
+@binding(2)
+var<uniform> uniforms: Uniforms;
+
+
 @compute
-@workgroup_size(1)
-fn main(@builtin(global_invocation_id) global_id: vec3<u32>, @builtin(num_workgroups) num_workgroups: vec3<u32>) {
+@workgroup_size(16, 16)
+fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     let coords = vec2<i32>(global_id.xy);
+
+    // Bounds check (important if image size isn’t a multiple of 16)
+    if coords.x >= i32(uniforms.output_size.x) || coords.y >= i32(uniforms.output_size.y) {
+        return;
+    }
+
     let offset_top_left = vec2<f32>(coords);
-    let offset_bottom_right = vec2<f32>(num_workgroups.xy) - offset_top_left;
+    let offset_bottom_right = vec2<f32>(uniforms.output_size.xy) - offset_top_left;
     let radius = 50.0;
     // let min_offset = calculate_min_offset(offset_top_left, offset_bottom_right);
-    let picture_half_size = vec2<f32>(num_workgroups.xy) * 0.5;
+    let picture_half_size = vec2<f32>(uniforms.output_size.xy) * 0.5;
     let min_offset = calculate_rounded_offset((offset_top_left - picture_half_size), picture_half_size - radius, radius);
     let opacity = smoothstep(0.0, radius, min_offset);
     var color = textureLoad(image, coords, 0);

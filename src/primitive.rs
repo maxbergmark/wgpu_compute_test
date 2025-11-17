@@ -58,6 +58,7 @@ impl Primitive {
         let processing_bind_group = ProcessingShader::create_bind_group(
             device,
             &renderer.processing_shader.pipeline,
+            &renderer.uniforms,
             &textures,
         );
         let downsample_bind_group = DownsampleShader::create_bind_group(
@@ -111,7 +112,7 @@ impl iced::widget::shader::Primitive for Primitive {
         let textures = self.create_image_textures(image, device, queue);
         let fragment_shader =
             FragmentShader::compile(device, format, &uniforms, &textures.output_texture);
-        let processing_shader = ProcessingShader::compile(device, &textures);
+        let processing_shader = ProcessingShader::compile(device, &uniforms, &textures);
         let downsample_shader = DownsampleShader::compile(device, &uniforms, &textures);
 
         ComputeRenderer {

@@ -21,7 +21,10 @@ pub fn enqueue_workload(
         cpass.set_pipeline(compute_pipeline);
         cpass.set_bind_group(0, bind_group, &[]);
         cpass.insert_debug_marker("Dispatching compute shader");
-        cpass.dispatch_workgroups(width, height, 1); // Number of cells to run, the (x,y,z) size of item being processed
+        let workgroup_size = 16;
+        let dispatch_x = width.div_ceil(workgroup_size);
+        let dispatch_y = height.div_ceil(workgroup_size);
+        cpass.dispatch_workgroups(dispatch_x, dispatch_y, 1); // Number of cells to run, the (x,y,z) size of item being processed
     }
 }
 

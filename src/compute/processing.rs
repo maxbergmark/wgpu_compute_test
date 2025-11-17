@@ -10,9 +10,14 @@ use crate::{
 pub struct ProcessingShader;
 
 impl ProcessingShader {
-    pub fn compile(device: &wgpu::Device, textures: &Textures) -> ComputeShaderData {
+    pub fn compile(
+        device: &wgpu::Device,
+        uniforms: &wgpu::Buffer,
+        textures: &Textures,
+    ) -> ComputeShaderData {
         let processing_pipeline = Self::create_pipeline(device);
-        let processing_bind_group = Self::create_bind_group(device, &processing_pipeline, textures);
+        let processing_bind_group =
+            Self::create_bind_group(device, &processing_pipeline, uniforms, textures);
         ComputeShaderData {
             pipeline: processing_pipeline,
             bind_group: processing_bind_group,
@@ -67,6 +72,16 @@ impl ProcessingShader {
                     },
                     count: None,
                 },
+                wgpu::BindGroupLayoutEntry {
+                    binding: 2,
+                    visibility: wgpu::ShaderStages::COMPUTE,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                },
             ],
         })
     }
@@ -74,6 +89,7 @@ impl ProcessingShader {
     pub fn create_bind_group(
         device: &wgpu::Device,
         compute_pipeline: &wgpu::ComputePipeline,
+        uniforms: &wgpu::Buffer,
         textures: &Textures,
     ) -> wgpu::BindGroup {
         let bind_group_layout = compute_pipeline.get_bind_group_layout(0);
@@ -91,6 +107,10 @@ impl ProcessingShader {
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: wgpu::BindingResource::TextureView(&output_texture_view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::Buffer(uniforms.as_entire_buffer_binding()),
                 },
             ],
         })

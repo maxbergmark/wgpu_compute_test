@@ -2,6 +2,7 @@ struct Uniforms {
     mouse: vec2<f32>,
     window_size: vec2<f32>,
     image_size: vec2<f32>,
+    output_size: vec2<f32>,
     scroll_delta: f32,
     _padding: f32,
 };

@@ -4,7 +4,12 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{primitive::Primitive, ui::Message, uniforms::Uniforms, util::Tof32};
+use crate::{
+    primitive::Primitive,
+    ui::Message,
+    uniforms::Uniforms,
+    util::{Resize, Tof32},
+};
 
 #[derive(Debug, Clone)]
 pub struct Program {
@@ -74,6 +79,7 @@ impl iced::widget::shader::Program<Message> for Program {
                 mouse_pos: self.mouse_pos,
                 scroll_delta: self.scroll_delta,
                 window_size: bounds.size(),
+                output_size: bounds.size().resize(1.2),
                 image_size,
             },
             image_path: self.image_path.clone(),
