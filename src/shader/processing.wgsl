@@ -30,22 +30,17 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
         return;
     }
 
-    let offset_top_left = vec2<f32>(coords);
-    let offset_bottom_right = vec2<f32>(uniforms.output_size.xy) - offset_top_left;
-    let radius = 50.0;
-    // let min_offset = calculate_min_offset(offset_top_left, offset_bottom_right);
-    let picture_half_size = vec2<f32>(uniforms.output_size.xy) * 0.5;
-    let min_offset = calculate_rounded_offset((offset_top_left - picture_half_size), picture_half_size - radius, radius);
-    let opacity = smoothstep(0.0, radius, min_offset);
     var color = textureLoad(image, coords, 0);
-    color.a = 1.0 - opacity;
+    color.a = calculate_opacity(coords);
     textureStore(output, coords, color);
 }
 
-fn calculate_min_offset(offset_top_left: vec2<f32>, offset_bottom_right: vec2<f32>) -> f32 {
-    let offset_x = min(offset_top_left.x, offset_bottom_right.x);
-    let offset_y = min(offset_top_left.y, offset_bottom_right.y);
-    return min(offset_x, offset_y);
+fn calculate_opacity(coords: vec2<i32>) -> f32 {
+    let p = vec2<f32>(coords);
+    let radius = 50.0;
+    let picture_half_size = vec2<f32>(uniforms.output_size.xy) * 0.5;
+    let min_offset = calculate_rounded_offset((p - picture_half_size), picture_half_size - radius, radius);
+    return 1.0 - smoothstep(0.0, radius, min_offset);
 }
 
 fn calculate_rounded_offset(
