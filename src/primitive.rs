@@ -3,13 +3,13 @@ use std::{
     sync::Arc,
 };
 
-use tracing::info;
-
 use crate::{
     Result,
     compute::{
-        self, downsample::DownsampleShader, fragment::FragmentShader, processing::ProcessingShader,
+        self, demosaic::DemosaicShader, downsample::DownsampleShader, fragment::FragmentShader,
+        processing::ProcessingShader,
     },
+    program,
     renderer::{ComputeRenderer, Textures},
     uniforms::{self, Uniforms},
     util::{Resize, Tof32, Tou32, timed},
@@ -19,7 +19,7 @@ use crate::{
 pub struct Primitive {
     pub uniforms: Uniforms,
     pub image_path: PathBuf,
-    pub image: Arc<image::DynamicImage>,
+    pub image: Arc<program::Image>,
 }
 
 impl Primitive {
@@ -50,45 +50,29 @@ impl Primitive {
         let image = self.image.as_ref();
         // TODO: No need to recreate the full size texture if the image hasn't changed
         let textures = self.create_image_textures(image, device, queue);
-        let (fragment_bind_group, fragment_uniform_bind_group) = FragmentShader::create_bind_group(
-            device,
-            &renderer.fragment_shader.pipeline,
-            &renderer.uniforms,
-            &textures.output_texture,
-        );
-        let (processing_bind_group, processing_uniform_bind_group) =
-            ProcessingShader::create_bind_group(
-                device,
-                &renderer.processing_shader.pipeline,
-                &renderer.uniforms,
-                &textures,
-            );
-        let (downsample_bind_group, downsample_uniform_bind_group) =
-            DownsampleShader::create_bind_group(
-                device,
-                &renderer.downsample_shader.pipeline,
-                &renderer.uniforms,
-                &textures,
-            );
         renderer.image_path.clone_from(&self.image_path);
         renderer.textures = textures;
-        renderer.fragment_shader.bind_group = fragment_bind_group;
-        renderer.fragment_shader.uniform_bind_group = fragment_uniform_bind_group;
-        renderer.processing_shader.bind_group = processing_bind_group;
-        renderer.downsample_shader.bind_group = downsample_bind_group;
-        renderer.processing_shader.uniform_bind_group = processing_uniform_bind_group;
-        renderer.downsample_shader.uniform_bind_group = downsample_uniform_bind_group;
+        renderer.replace_bind_groups(device);
     }
 
     fn create_image_textures(
         &self,
-        image: &image::DynamicImage,
+        image: &program::Image,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
     ) -> Textures {
         let image_size = iced::Size::new(image.width(), image.height());
         let window_size = self.uniforms.window_size.to_u32();
-        let full_texture = compute::create_texture(device, image);
+        let full_texture = match image {
+            program::Image::DynamicImage(dynamic_image) => {
+                compute::create_texture(device, dynamic_image)
+            }
+            program::Image::RawImage(_) => {
+                compute::create_float_texture(device, image_size, wgpu::TextureFormat::R32Float)
+            }
+        };
+        let full_output_texture =
+            compute::create_float_texture(device, image_size, wgpu::TextureFormat::Rgba32Float);
         let input_texture = compute::create_window_texture(device, window_size, image_size);
         let output_texture = compute::create_window_texture(device, window_size, image_size);
         let output_size = crate::util::calculate_image_size(window_size, image_size).resize(1.2);
@@ -96,6 +80,7 @@ impl Primitive {
 
         Textures {
             full_texture,
+            full_output_texture,
             input_texture,
             output_texture,
             image_size,
@@ -118,14 +103,16 @@ impl iced::widget::shader::Primitive for Primitive {
         let textures = self.create_image_textures(image, device, queue);
         let fragment_shader =
             FragmentShader::compile(device, format, &uniforms, &textures.output_texture);
-        let processing_shader = ProcessingShader::compile(device, &uniforms, &textures);
+        let demosaic_shader = DemosaicShader::compile(device, &uniforms, &textures);
         let downsample_shader = DownsampleShader::compile(device, &uniforms, &textures);
+        let processing_shader = ProcessingShader::compile(device, &uniforms, &textures);
 
         ComputeRenderer {
             fragment_shader,
             uniforms,
-            processing_shader,
+            demosaic_shader,
             downsample_shader,
+            processing_shader,
             image_path: self.image_path.clone(),
             textures,
         }
@@ -156,19 +143,25 @@ impl iced::widget::shader::Primitive for Primitive {
     ) {
         compute::enqueue_workload(
             encoder,
+            &renderer.demosaic_shader.pipeline,
+            &renderer.demosaic_shader.bind_group,
+            &renderer.demosaic_shader.uniform_bind_group,
+            renderer.textures.image_size,
+        );
+
+        compute::enqueue_workload(
+            encoder,
             &renderer.downsample_shader.pipeline,
             &renderer.downsample_shader.bind_group,
             &renderer.downsample_shader.uniform_bind_group,
-            renderer.textures.output_size.width,
-            renderer.textures.output_size.height,
+            renderer.textures.output_size,
         );
         compute::enqueue_workload(
             encoder,
             &renderer.processing_shader.pipeline,
             &renderer.processing_shader.bind_group,
             &renderer.processing_shader.uniform_bind_group,
-            renderer.textures.output_size.width,
-            renderer.textures.output_size.height,
+            renderer.textures.output_size,
         );
         enqueue_draw(renderer, encoder, target, bounds);
     }
@@ -226,6 +219,11 @@ fn should_resize(new_size: iced::Size<u32>, current_size: iced::Size<u32>) -> bo
 
 pub fn load_image(path: &Path) -> Result<image::DynamicImage> {
     let image = image::ImageReader::open(path)?.decode()?;
+    Ok(image)
+}
+
+pub fn load_cr2_image(path: &Path) -> Result<rawloader::RawImage> {
+    let image = rawloader::decode_file(path)?;
     Ok(image)
 }
 

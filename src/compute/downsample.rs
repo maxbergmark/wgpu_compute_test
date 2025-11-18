@@ -60,7 +60,7 @@ impl DownsampleShader {
                     binding: 0,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
                         view_dimension: wgpu::TextureViewDimension::D2,
                         multisampled: false,
                     },
@@ -87,7 +87,7 @@ impl DownsampleShader {
         textures: &Textures,
     ) -> (wgpu::BindGroup, wgpu::BindGroup) {
         let bind_group_layout = pipeline.get_bind_group_layout(0);
-        let full_texture_view = to_texture_view(&textures.full_texture);
+        let full_texture_view = to_texture_view(&textures.full_output_texture);
         let input_texture_view = to_texture_view(&textures.input_texture);
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {

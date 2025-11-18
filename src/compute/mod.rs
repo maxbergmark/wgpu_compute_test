@@ -1,8 +1,8 @@
 use image::GenericImageView;
 
-use crate::util::Resize;
+use crate::{program, util::Resize};
 
-// pub mod demosaic;
+pub mod demosaic;
 pub mod downsample;
 pub mod fragment;
 pub mod processing;
@@ -12,8 +12,7 @@ pub fn enqueue_workload(
     compute_pipeline: &wgpu::ComputePipeline,
     bind_group: &wgpu::BindGroup,
     uniform_bind_group: &wgpu::BindGroup,
-    width: u32,
-    height: u32,
+    size: iced::Size<u32>,
 ) {
     {
         let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
@@ -25,8 +24,8 @@ pub fn enqueue_workload(
         cpass.set_bind_group(1, uniform_bind_group, &[]);
         cpass.insert_debug_marker("Dispatching compute shader");
         let workgroup_size = 16;
-        let dispatch_x = width.div_ceil(workgroup_size);
-        let dispatch_y = height.div_ceil(workgroup_size);
+        let dispatch_x = size.width.div_ceil(workgroup_size);
+        let dispatch_y = size.height.div_ceil(workgroup_size);
         cpass.dispatch_workgroups(dispatch_x, dispatch_y, 1); // Number of cells to run, the (x,y,z) size of item being processed
     }
 }
@@ -65,7 +64,7 @@ pub fn uniforms_bind_group(
 pub fn create_texture(device: &wgpu::Device, image: &image::DynamicImage) -> wgpu::Texture {
     let (width, height) = image.dimensions();
     device.create_texture(&wgpu::TextureDescriptor {
-        label: Some("Storage Texture"),
+        label: Some("Storage JPG Texture"),
         size: wgpu::Extent3d {
             width,
             height,
@@ -79,6 +78,29 @@ pub fn create_texture(device: &wgpu::Device, image: &image::DynamicImage) -> wgp
             | wgpu::TextureUsages::COPY_DST
             | wgpu::TextureUsages::TEXTURE_BINDING,
         view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
+    })
+}
+
+pub fn create_float_texture(
+    device: &wgpu::Device,
+    size: iced::Size<u32>,
+    format: wgpu::TextureFormat,
+) -> wgpu::Texture {
+    device.create_texture(&wgpu::TextureDescriptor {
+        label: Some("Storage Float Texture"),
+        size: wgpu::Extent3d {
+            width: size.width,
+            height: size.height,
+            depth_or_array_layers: 1,
+        },
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format,
+        usage: wgpu::TextureUsages::STORAGE_BINDING
+            | wgpu::TextureUsages::COPY_DST
+            | wgpu::TextureUsages::TEXTURE_BINDING,
+        view_formats: &[format],
     })
 }
 
@@ -121,8 +143,30 @@ pub fn to_texture_view(texture: &wgpu::Texture) -> wgpu::TextureView {
     })
 }
 
-pub fn write_texture(queue: &wgpu::Queue, texture: &wgpu::Texture, image: &image::DynamicImage) {
+pub fn write_texture(queue: &wgpu::Queue, texture: &wgpu::Texture, image: &program::Image) {
     let (width, height) = image.dimensions();
+    let data: Vec<u8> = match image {
+        program::Image::DynamicImage(img) => img.to_rgba8().into_raw(),
+        program::Image::RawImage(raw) => match &raw.data {
+            rawloader::RawImageData::Integer(items) => bytemuck::cast_slice(
+                &items
+                    .iter()
+                    .copied()
+                    .map(f32::from)
+                    // .flat_map(|v| [v, v, v, v])
+                    .collect::<Vec<f32>>(),
+            )
+            .to_vec(),
+            #[allow(clippy::panic)]
+            rawloader::RawImageData::Float(_) => panic!("Not supported"),
+        },
+    };
+
+    // info!("Writing texture of size {}x{}", width, height);
+    // info!("Data length: {}", data.len());
+    // info!("Bytes per row: {}", 4 * width);
+    // info!("Rows per image: {}", data.len() as u32 / (4 * width));
+    // info!("Texture: {:?}", texture.format());
     queue.write_texture(
         wgpu::TexelCopyTextureInfo {
             texture,
@@ -130,7 +174,7 @@ pub fn write_texture(queue: &wgpu::Queue, texture: &wgpu::Texture, image: &image
             origin: wgpu::Origin3d::ZERO,
             aspect: wgpu::TextureAspect::All,
         },
-        &image.to_rgba8(),
+        &data,
         wgpu::TexelCopyBufferLayout {
             offset: 0,
             bytes_per_row: Some(4 * width),

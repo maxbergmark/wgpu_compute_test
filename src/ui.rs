@@ -61,6 +61,10 @@ impl Ui {
                     .on_press(Message::LoadImage("assets/IMG_7575.jpg".into())),
                 iced::widget::button("IMG_7679.jpg")
                     .on_press(Message::LoadImage("assets/IMG_7679.jpg".into())),
+                iced::widget::button("IMG_7388.CR2")
+                    .on_press(Message::LoadImage("assets/IMG_7388.CR2".into())),
+                iced::widget::button("IMG_7679.CR2")
+                    .on_press(Message::LoadImage("assets/IMG_7679.CR2".into())),
                 iced::widget::text(format!(
                     "Image size: {}x{}, Window size: {}x{}\nUpdate time: {:.2?}",
                     self.program.image_size.width,
@@ -130,8 +134,22 @@ impl Ui {
 
     #[allow(clippy::cognitive_complexity)]
     fn load_image(&mut self, path: &Path) {
-        if let Err(e) = self.program.load_image(path) {
-            error!("Error loading image: {}", e);
+        if let Some(extension) = path.extension().and_then(|ext| ext.to_str()) {
+            match extension {
+                "cr2" | "CR2" => {
+                    if let Err(e) = self.program.load_cr2_image(path) {
+                        error!("Error loading CR2 image: {}", e);
+                    }
+                }
+                "jpg" | "JPG" => {
+                    if let Err(e) = self.program.load_image(path) {
+                        error!("Error loading image: {}", e);
+                    }
+                }
+                _ => {
+                    error!("Unsupported image format: {}", extension);
+                }
+            }
         }
     }
 

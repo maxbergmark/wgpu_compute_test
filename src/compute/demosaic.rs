@@ -3,43 +3,47 @@ use std::borrow::Cow;
 use wgpu::PipelineCompilationOptions;
 
 use crate::{
-    compute::to_texture_view,
+    compute::{to_texture_view, uniforms_bind_group, uniforms_bind_group_layout},
     renderer::{ComputeShaderData, Textures},
 };
 
-pub struct DownsampleShader;
+pub struct DemosaicShader;
 
-impl DownsampleShader {
+impl DemosaicShader {
     pub fn compile(
         device: &wgpu::Device,
         uniforms: &wgpu::Buffer,
         textures: &Textures,
     ) -> ComputeShaderData {
-        let downsample_pipeline = Self::create_pipeline(device);
-        let downsample_bind_group =
-            Self::create_bind_group(device, &downsample_pipeline, uniforms, textures);
+        let pipeline = Self::create_pipeline(device);
+        let (bind_group, uniform_bind_group) =
+            Self::create_bind_group(device, &pipeline, uniforms, textures);
         ComputeShaderData {
-            pipeline: downsample_pipeline,
-            bind_group: downsample_bind_group,
+            pipeline,
+            bind_group,
+            uniform_bind_group,
         }
     }
 
     pub fn create_pipeline(device: &wgpu::Device) -> wgpu::ComputePipeline {
         let cs_module = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("downsample_shader"),
+            label: Some("demosaic_shader"),
             source: wgpu::ShaderSource::Wgsl(Cow::Borrowed(include_str!(
-                "../shader/downsample.wgsl"
+                "../shader/demosaic.wgsl"
             ))),
         });
 
         let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("downsample_pipeline_layout"),
-            bind_group_layouts: &[&Self::create_bind_group_layout(device)],
+            label: Some("demosaic_pipeline_layout"),
+            bind_group_layouts: &[
+                &Self::create_bind_group_layout(device),
+                &uniforms_bind_group_layout(device),
+            ],
             push_constant_ranges: &[],
         });
 
         device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-            label: Some("downsample_pipeline"),
+            label: Some("demosaic_pipeline"),
             layout: Some(&layout),
             module: &cs_module,
             entry_point: Some("main"),
@@ -50,13 +54,13 @@ impl DownsampleShader {
 
     fn create_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
         device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("downsample_bind_group_layout"),
+            label: Some("demosaic_bind_group_layout"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
+                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
                         view_dimension: wgpu::TextureViewDimension::D2,
                         multisampled: false,
                     },
@@ -67,18 +71,8 @@ impl DownsampleShader {
                     visibility: wgpu::ShaderStages::COMPUTE,
                     ty: wgpu::BindingType::StorageTexture {
                         access: wgpu::StorageTextureAccess::WriteOnly,
-                        format: wgpu::TextureFormat::Rgba8Unorm,
+                        format: wgpu::TextureFormat::Rgba32Float,
                         view_dimension: wgpu::TextureViewDimension::D2,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
                     },
                     count: None,
                 },
@@ -88,16 +82,16 @@ impl DownsampleShader {
 
     pub fn create_bind_group(
         device: &wgpu::Device,
-        downsample_pipeline: &wgpu::ComputePipeline,
+        pipeline: &wgpu::ComputePipeline,
         uniforms: &wgpu::Buffer,
         textures: &Textures,
-    ) -> wgpu::BindGroup {
-        let bind_group_layout = downsample_pipeline.get_bind_group_layout(0);
+    ) -> (wgpu::BindGroup, wgpu::BindGroup) {
+        let bind_group_layout = pipeline.get_bind_group_layout(0);
         let full_texture_view = to_texture_view(&textures.full_texture);
-        let input_texture_view = to_texture_view(&textures.input_texture);
+        let full_output_texture_view = to_texture_view(&textures.full_output_texture);
 
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("downsample_bind_group"),
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("demosaic_bind_group"),
             layout: &bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
@@ -106,13 +100,13 @@ impl DownsampleShader {
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&input_texture_view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::Buffer(uniforms.as_entire_buffer_binding()),
+                    resource: wgpu::BindingResource::TextureView(&full_output_texture_view),
                 },
             ],
-        })
+        });
+
+        let uniform_bind_group_layout = pipeline.get_bind_group_layout(1);
+        let uniform_bind_group = uniforms_bind_group(device, &uniform_bind_group_layout, uniforms);
+        (bind_group, uniform_bind_group)
     }
 }

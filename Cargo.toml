@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 bytemuck = "1.24.0"
+derive_more = { version = "2.0.1", features = ["display", "from"] }
 iced = { git = "https://github.com/iced-rs/iced.git", branch = "master", features = [
     "image",
     "wgpu",
