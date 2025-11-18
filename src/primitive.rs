@@ -3,6 +3,8 @@ use std::{
     sync::Arc,
 };
 
+use tracing::info;
+
 use crate::{
     Result,
     compute::{
@@ -10,7 +12,7 @@ use crate::{
     },
     renderer::{ComputeRenderer, Textures},
     uniforms::{self, Uniforms},
-    util::{Resize, Tou32, timed},
+    util::{Resize, Tof32, Tou32, timed},
 };
 
 #[derive(Debug)]
@@ -30,7 +32,7 @@ impl Primitive {
         if renderer.image_path != self.image_path
             || should_resize(
                 self.uniforms.window_size.to_u32(),
-                renderer.textures.window_size,
+                renderer.textures.output_size,
             )
         {
             timed("Recreating buffers", || {
@@ -48,30 +50,34 @@ impl Primitive {
         let image = self.image.as_ref();
         // TODO: No need to recreate the full size texture if the image hasn't changed
         let textures = self.create_image_textures(image, device, queue);
-        let layout = renderer.fragment_shader.pipeline.get_bind_group_layout(0);
-        let fragment_bind_group = FragmentShader::create_bind_group(
+        let (fragment_bind_group, fragment_uniform_bind_group) = FragmentShader::create_bind_group(
             device,
-            &layout,
+            &renderer.fragment_shader.pipeline,
             &renderer.uniforms,
             &textures.output_texture,
         );
-        let processing_bind_group = ProcessingShader::create_bind_group(
-            device,
-            &renderer.processing_shader.pipeline,
-            &renderer.uniforms,
-            &textures,
-        );
-        let downsample_bind_group = DownsampleShader::create_bind_group(
-            device,
-            &renderer.downsample_shader.pipeline,
-            &renderer.uniforms,
-            &textures,
-        );
+        let (processing_bind_group, processing_uniform_bind_group) =
+            ProcessingShader::create_bind_group(
+                device,
+                &renderer.processing_shader.pipeline,
+                &renderer.uniforms,
+                &textures,
+            );
+        let (downsample_bind_group, downsample_uniform_bind_group) =
+            DownsampleShader::create_bind_group(
+                device,
+                &renderer.downsample_shader.pipeline,
+                &renderer.uniforms,
+                &textures,
+            );
         renderer.image_path.clone_from(&self.image_path);
         renderer.textures = textures;
         renderer.fragment_shader.bind_group = fragment_bind_group;
+        renderer.fragment_shader.uniform_bind_group = fragment_uniform_bind_group;
         renderer.processing_shader.bind_group = processing_bind_group;
         renderer.downsample_shader.bind_group = downsample_bind_group;
+        renderer.processing_shader.uniform_bind_group = processing_uniform_bind_group;
+        renderer.downsample_shader.uniform_bind_group = downsample_uniform_bind_group;
     }
 
     fn create_image_textures(
@@ -85,7 +91,7 @@ impl Primitive {
         let full_texture = compute::create_texture(device, image);
         let input_texture = compute::create_window_texture(device, window_size, image_size);
         let output_texture = compute::create_window_texture(device, window_size, image_size);
-        let size = crate::util::calculate_image_size(window_size, image_size).resize(1.2);
+        let output_size = crate::util::calculate_image_size(window_size, image_size).resize(1.2);
         compute::write_texture(queue, &full_texture, image);
 
         Textures {
@@ -93,7 +99,7 @@ impl Primitive {
             input_texture,
             output_texture,
             image_size,
-            window_size: size,
+            output_size,
         }
     }
 }
@@ -137,7 +143,7 @@ impl iced::widget::shader::Primitive for Primitive {
         queue.write_buffer(
             &renderer.uniforms,
             0,
-            bytemuck::bytes_of(&self.uniforms.to_raw()),
+            bytemuck::bytes_of(&self.uniforms.to_raw(renderer.textures.output_size.to_f32())),
         );
     }
 
@@ -152,15 +158,17 @@ impl iced::widget::shader::Primitive for Primitive {
             encoder,
             &renderer.downsample_shader.pipeline,
             &renderer.downsample_shader.bind_group,
-            renderer.textures.window_size.width,
-            renderer.textures.window_size.height,
+            &renderer.downsample_shader.uniform_bind_group,
+            renderer.textures.output_size.width,
+            renderer.textures.output_size.height,
         );
         compute::enqueue_workload(
             encoder,
             &renderer.processing_shader.pipeline,
             &renderer.processing_shader.bind_group,
-            renderer.textures.window_size.width,
-            renderer.textures.window_size.height,
+            &renderer.processing_shader.uniform_bind_group,
+            renderer.textures.output_size.width,
+            renderer.textures.output_size.height,
         );
         enqueue_draw(renderer, encoder, target, bounds);
     }
@@ -199,6 +207,7 @@ fn enqueue_draw(
 
     pass.set_pipeline(&renderer.fragment_shader.pipeline);
     pass.set_bind_group(0, &renderer.fragment_shader.bind_group, &[]);
+    pass.set_bind_group(1, &renderer.fragment_shader.uniform_bind_group, &[]);
     pass.draw(0..6, 0..1);
 }
 

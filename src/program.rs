@@ -4,12 +4,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use crate::{
-    primitive::Primitive,
-    ui::Message,
-    uniforms::Uniforms,
-    util::{Resize, Tof32},
-};
+use crate::{primitive::Primitive, ui::Message, uniforms::Uniforms, util::Tof32};
 
 #[derive(Debug, Clone)]
 pub struct Program {
@@ -21,11 +16,6 @@ pub struct Program {
     pub last_iteration: Instant,
     pub last_frame_time: Duration,
 }
-
-// #[derive(Debug, Default)]
-// pub struct State {
-//     pub image: Option<image::DynamicImage>,
-// }
 
 impl Default for Program {
     fn default() -> Self {
@@ -72,14 +62,12 @@ impl iced::widget::shader::Program<Message> for Program {
         _cursor: iced::mouse::Cursor,
         bounds: iced::Rectangle,
     ) -> Self::Primitive {
-        // let image = std::mem::take(self.image);
         let image_size = self.image_size.to_f32();
         Primitive {
             uniforms: Uniforms {
                 mouse_pos: self.mouse_pos,
                 scroll_delta: self.scroll_delta,
                 window_size: bounds.size(),
-                output_size: bounds.size().resize(1.2),
                 image_size,
             },
             image_path: self.image_path.clone(),

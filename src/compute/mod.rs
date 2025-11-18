@@ -2,6 +2,7 @@ use image::GenericImageView;
 
 use crate::util::Resize;
 
+// pub mod demosaic;
 pub mod downsample;
 pub mod fragment;
 pub mod processing;
@@ -10,6 +11,7 @@ pub fn enqueue_workload(
     encoder: &mut wgpu::CommandEncoder,
     compute_pipeline: &wgpu::ComputePipeline,
     bind_group: &wgpu::BindGroup,
+    uniform_bind_group: &wgpu::BindGroup,
     width: u32,
     height: u32,
 ) {
@@ -20,12 +22,44 @@ pub fn enqueue_workload(
         });
         cpass.set_pipeline(compute_pipeline);
         cpass.set_bind_group(0, bind_group, &[]);
+        cpass.set_bind_group(1, uniform_bind_group, &[]);
         cpass.insert_debug_marker("Dispatching compute shader");
         let workgroup_size = 16;
         let dispatch_x = width.div_ceil(workgroup_size);
         let dispatch_y = height.div_ceil(workgroup_size);
         cpass.dispatch_workgroups(dispatch_x, dispatch_y, 1); // Number of cells to run, the (x,y,z) size of item being processed
     }
+}
+
+pub fn uniforms_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+    device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some("uniforms_bind_group_layout"),
+        entries: &[wgpu::BindGroupLayoutEntry {
+            binding: 0,
+            visibility: wgpu::ShaderStages::COMPUTE | wgpu::ShaderStages::VERTEX_FRAGMENT,
+            ty: wgpu::BindingType::Buffer {
+                ty: wgpu::BufferBindingType::Uniform,
+                has_dynamic_offset: false,
+                min_binding_size: None,
+            },
+            count: None,
+        }],
+    })
+}
+
+pub fn uniforms_bind_group(
+    device: &wgpu::Device,
+    layout: &wgpu::BindGroupLayout,
+    uniforms: &wgpu::Buffer,
+) -> wgpu::BindGroup {
+    device.create_bind_group(&wgpu::BindGroupDescriptor {
+        label: Some("uniforms_bind_group"),
+        layout,
+        entries: &[wgpu::BindGroupEntry {
+            binding: 0,
+            resource: wgpu::BindingResource::Buffer(uniforms.as_entire_buffer_binding()),
+        }],
+    })
 }
 
 pub fn create_texture(device: &wgpu::Device, image: &image::DynamicImage) -> wgpu::Texture {

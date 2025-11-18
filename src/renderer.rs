@@ -12,11 +12,13 @@ pub struct ComputeRenderer {
 pub struct ComputeShaderData {
     pub pipeline: wgpu::ComputePipeline,
     pub bind_group: wgpu::BindGroup,
+    pub uniform_bind_group: wgpu::BindGroup,
 }
 
 pub struct RenderShaderData {
     pub pipeline: wgpu::RenderPipeline,
     pub bind_group: wgpu::BindGroup,
+    pub uniform_bind_group: wgpu::BindGroup,
 }
 
 pub struct Textures {
@@ -25,5 +27,5 @@ pub struct Textures {
     pub output_texture: wgpu::Texture,
     #[allow(dead_code)]
     pub image_size: iced::Size<u32>,
-    pub window_size: iced::Size<u32>,
+    pub output_size: iced::Size<u32>,
 }

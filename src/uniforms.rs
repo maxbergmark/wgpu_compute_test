@@ -4,17 +4,16 @@ pub struct Uniforms {
     pub scroll_delta: f32,
     pub window_size: iced::Size<f32>,
     pub image_size: iced::Size<f32>,
-    pub output_size: iced::Size<f32>,
 }
 
 impl Uniforms {
-    pub fn to_raw(self) -> Raw {
+    pub fn to_raw(self, output_size: iced::Size<f32>) -> Raw {
         Raw {
             mouse_pos: [self.mouse_pos.0, self.mouse_pos.1],
             scroll_delta: self.scroll_delta,
             window_size: self.window_size.into(),
             image_size: self.image_size.into(),
-            output_size: self.output_size.into(),
+            output_size: output_size.into(),
             _padding: [0.0],
         }
     }

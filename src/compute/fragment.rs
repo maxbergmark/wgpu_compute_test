@@ -1,6 +1,9 @@
 use std::borrow::Cow;
 
-use crate::{compute, renderer::RenderShaderData};
+use crate::{
+    compute::{self, uniforms_bind_group_layout},
+    renderer::RenderShaderData,
+};
 
 pub struct FragmentShader;
 
@@ -12,21 +15,24 @@ impl FragmentShader {
         output_texture: &wgpu::Texture,
     ) -> RenderShaderData {
         let pipeline = Self::create_pipeline(device, format);
-        let layout = pipeline.get_bind_group_layout(0);
-        let bind_group = Self::create_bind_group(device, &layout, uniforms, output_texture);
+        let (bind_group, uniform_bind_group) =
+            Self::create_bind_group(device, &pipeline, uniforms, output_texture);
         RenderShaderData {
             pipeline,
             bind_group,
+            uniform_bind_group,
         }
     }
     pub fn create_pipeline(
         device: &wgpu::Device,
         format: wgpu::TextureFormat,
     ) -> wgpu::RenderPipeline {
-        let layout = Self::create_bind_group_layout(device);
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: Some("primitive.create_pipeline.layout"),
-            bind_group_layouts: &[&layout],
+            bind_group_layouts: &[
+                &Self::create_bind_group_layout(device),
+                &uniforms_bind_group_layout(device),
+            ],
             push_constant_ranges: &[],
         });
 
@@ -71,16 +77,6 @@ impl FragmentShader {
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                     ty: wgpu::BindingType::Texture {
                         sample_type: wgpu::TextureSampleType::Float { filterable: true },
                         view_dimension: wgpu::TextureViewDimension::D2,
@@ -89,7 +85,7 @@ impl FragmentShader {
                     count: None,
                 },
                 wgpu::BindGroupLayoutEntry {
-                    binding: 2,
+                    binding: 1,
                     visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
                     ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                     count: None,
@@ -100,30 +96,31 @@ impl FragmentShader {
 
     pub fn create_bind_group(
         device: &wgpu::Device,
-        layout: &wgpu::BindGroupLayout,
+        pipeline: &wgpu::RenderPipeline,
         uniforms: &wgpu::Buffer,
         texture: &wgpu::Texture,
-    ) -> wgpu::BindGroup {
+    ) -> (wgpu::BindGroup, wgpu::BindGroup) {
         let sampler = compute::create_sampler(device);
         let texture_view = compute::to_texture_view(texture);
 
-        device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             label: Some("primitive.bind_group"),
-            layout,
+            layout: &pipeline.get_bind_group_layout(0),
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::Buffer(uniforms.as_entire_buffer_binding()),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
                     resource: wgpu::BindingResource::TextureView(&texture_view),
                 },
                 wgpu::BindGroupEntry {
-                    binding: 2,
+                    binding: 1,
                     resource: wgpu::BindingResource::Sampler(&sampler),
                 },
             ],
-        })
+        });
+
+        let uniform_bind_group_layout = pipeline.get_bind_group_layout(1);
+        let uniform_bind_group =
+            compute::uniforms_bind_group(device, &uniform_bind_group_layout, uniforms);
+        (bind_group, uniform_bind_group)
     }
 }

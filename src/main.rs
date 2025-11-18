@@ -32,6 +32,7 @@
 use iced::Task;
 
 use crate::ui::{Message, Ui};
+use rawloader as _;
 
 mod compute;
 mod primitive;
