@@ -10,6 +10,7 @@ iced = { git = "https://github.com/iced-rs/iced.git", branch = "master", feature
     "image",
     "wgpu",
 ] }
+# iced_aw = { git = "https://github.com/iced-rs/iced_aw.git", branch = "main" }
 image = "0.25.8"
 rawloader = "0.37.1"
 tracing = "0.1.41"

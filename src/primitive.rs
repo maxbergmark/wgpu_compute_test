@@ -141,28 +141,9 @@ impl iced::widget::shader::Primitive for Primitive {
         target: &wgpu::TextureView,
         bounds: &iced::Rectangle<u32>,
     ) {
-        compute::enqueue_workload(
-            encoder,
-            &renderer.demosaic_shader.pipeline,
-            &renderer.demosaic_shader.bind_group,
-            &renderer.demosaic_shader.uniform_bind_group,
-            renderer.textures.image_size,
-        );
-
-        compute::enqueue_workload(
-            encoder,
-            &renderer.downsample_shader.pipeline,
-            &renderer.downsample_shader.bind_group,
-            &renderer.downsample_shader.uniform_bind_group,
-            renderer.textures.output_size,
-        );
-        compute::enqueue_workload(
-            encoder,
-            &renderer.processing_shader.pipeline,
-            &renderer.processing_shader.bind_group,
-            &renderer.processing_shader.uniform_bind_group,
-            renderer.textures.output_size,
-        );
+        compute::enqueue_workload(encoder, &renderer.demosaic_shader);
+        compute::enqueue_workload(encoder, &renderer.downsample_shader);
+        compute::enqueue_workload(encoder, &renderer.processing_shader);
         enqueue_draw(renderer, encoder, target, bounds);
     }
 }

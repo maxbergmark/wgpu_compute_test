@@ -17,8 +17,11 @@ struct Uniforms {
     image_size: vec2<f32>,
     output_size: vec2<f32>,
     scroll_delta: f32,
-    _padding: vec3<f32>,
+    exposure: f32,
+    contrast: f32,
+    // _padding: vec3<f32>,
 };
+
 @group(1)
 @binding(0)
 var<uniform> uniforms: Uniforms;

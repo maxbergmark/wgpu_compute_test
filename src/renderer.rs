@@ -19,6 +19,7 @@ pub struct ComputeShaderData {
     pub pipeline: wgpu::ComputePipeline,
     pub bind_group: wgpu::BindGroup,
     pub uniform_bind_group: wgpu::BindGroup,
+    pub size: iced::Size<u32>,
 }
 
 pub struct RenderShaderData {
@@ -73,5 +74,8 @@ impl ComputeRenderer {
         self.processing_shader.uniform_bind_group = processing_uniform_bind_group;
         self.downsample_shader.uniform_bind_group = downsample_uniform_bind_group;
         self.demosaic_shader.uniform_bind_group = demosaic_uniform_bind_group;
+        self.processing_shader.size = self.textures.output_size;
+        self.downsample_shader.size = self.textures.output_size;
+        self.demosaic_shader.size = self.textures.image_size;
     }
 }

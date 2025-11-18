@@ -22,6 +22,7 @@ impl DemosaicShader {
             pipeline,
             bind_group,
             uniform_bind_group,
+            size: textures.image_size,
         }
     }
 

@@ -17,6 +17,9 @@ pub struct Program {
     pub image_size: iced::Size<u32>,
     pub last_iteration: Instant,
     pub last_frame_time: Duration,
+
+    pub exposure: f32,
+    pub contrast: f32,
 }
 
 #[derive(Debug, From)]
@@ -55,6 +58,8 @@ impl Default for Program {
             image_size: iced::Size::new(0, 0),
             last_iteration: Instant::now(),
             last_frame_time: Duration::default(),
+            exposure: 0.0,
+            contrast: 1.0,
         }
     }
 }
@@ -125,6 +130,8 @@ impl iced::widget::shader::Program<Message> for Program {
                 whitelevels,
                 blacklevels,
                 crops,
+                exposure: self.exposure,
+                contrast: self.contrast,
             },
             image_path: self.image_path.clone(),
             image: self.image.clone(),

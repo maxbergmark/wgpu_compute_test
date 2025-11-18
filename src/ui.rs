@@ -22,6 +22,8 @@ pub enum Message {
     MouseMoved(iced::Point),
     MouseScrolled(iced::mouse::ScrollDelta),
     WindowEvent(iced::window::Event),
+    Exposure(f32),
+    Contrast(f32),
 }
 
 impl Ui {
@@ -29,9 +31,13 @@ impl Ui {
         if self.program.image_path.as_os_str().is_empty() {
             iced::widget::text("No image loaded").into()
         } else {
-            iced::widget::center(iced::widget::column![self.image_view(), self.footer_view()])
-                .style(Self::style)
-                .into()
+            iced::widget::center(iced::widget::column![
+                self.image_view(),
+                self.control_view(),
+                self.footer_view()
+            ])
+            .style(Self::style)
+            .into()
         }
     }
 
@@ -54,17 +60,32 @@ impl Ui {
         .into()
     }
 
+    pub fn control_view(&self) -> Element<'_, Message> {
+        iced::widget::center_x(
+            iced::widget::row![
+                iced::widget::slider(-3.0..=3.0, self.program.exposure, Message::Exposure)
+                    .step(0.01)
+                    .width(200),
+                iced::widget::slider(0.0..=3.0, self.program.contrast, Message::Contrast)
+                    .step(0.01)
+                    .width(200)
+            ]
+            .spacing(20),
+        )
+        .into()
+    }
+
     pub fn footer_view(&self) -> Element<'_, Message> {
         iced::widget::container(
             iced::widget::row![
-                iced::widget::button("IMG_7575.jpg")
-                    .on_press(Message::LoadImage("assets/IMG_7575.jpg".into())),
-                iced::widget::button("IMG_7679.jpg")
-                    .on_press(Message::LoadImage("assets/IMG_7679.jpg".into())),
+                iced::widget::button("IMG_6637.CR2")
+                    .on_press(Message::LoadImage("assets/IMG_6637.CR2".into())),
+                iced::widget::button("IMG_6647.CR2")
+                    .on_press(Message::LoadImage("assets/IMG_6647.CR2".into())),
+                iced::widget::button("IMG_6655.CR2")
+                    .on_press(Message::LoadImage("assets/IMG_6655.CR2".into())),
                 iced::widget::button("IMG_7388.CR2")
                     .on_press(Message::LoadImage("assets/IMG_7388.CR2".into())),
-                iced::widget::button("IMG_7679.CR2")
-                    .on_press(Message::LoadImage("assets/IMG_7679.CR2".into())),
                 iced::widget::text(format!(
                     "Image size: {}x{}, Window size: {}x{}\nUpdate time: {:.2?}",
                     self.program.image_size.width,
@@ -129,6 +150,12 @@ impl Ui {
                 };
             }
             Message::WindowEvent(event) => self.process_window_event(&event),
+            Message::Exposure(value) => {
+                self.program.exposure = value;
+            }
+            Message::Contrast(value) => {
+                self.program.contrast = value;
+            }
         }
     }
 

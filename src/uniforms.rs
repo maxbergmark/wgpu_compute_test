@@ -9,6 +9,8 @@ pub struct Uniforms {
     pub whitelevels: [f32; 4],
     pub blacklevels: [f32; 4],
     pub crops: [u32; 4],
+    pub exposure: f32,
+    pub contrast: f32,
 }
 
 impl Uniforms {
@@ -24,7 +26,9 @@ impl Uniforms {
             window_size: self.window_size.into(),
             image_size: self.image_size.into(),
             output_size: output_size.into(),
-            _padding: [0.0; 3],
+            exposure: self.exposure,
+            contrast: self.contrast,
+            _padding: [0.0; 1],
             _pad2: [0.0; 4],
         }
     }
@@ -51,6 +55,8 @@ pub struct Raw {
     pub image_size: [f32; 2],
     pub output_size: [f32; 2],
     pub scroll_delta: f32,
-    _padding: [f32; 3],
+    pub exposure: f32,
+    pub contrast: f32,
+    _padding: [f32; 1],
     _pad2: [f32; 4],
 }

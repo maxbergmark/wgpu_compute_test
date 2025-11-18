@@ -22,6 +22,7 @@ impl DownsampleShader {
             pipeline,
             bind_group,
             uniform_bind_group,
+            size: textures.output_size,
         }
     }
 

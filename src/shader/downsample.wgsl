@@ -11,14 +11,15 @@ struct Uniforms {
     xyz_2_srgb: mat3x3<f32>,
     whitelevels: vec4<f32>,
     blacklevels: vec4<f32>,
-    // how much to crop the image to get all the usable area, order is top, right, bottom, left
     crops: vec4<u32>,
     mouse_pos: vec2<f32>,
     window_size: vec2<f32>,
     image_size: vec2<f32>,
     output_size: vec2<f32>,
     scroll_delta: f32,
-    _padding: vec3<f32>,
+    exposure: f32,
+    contrast: f32,
+    // _padding: vec3<f32>,
 };
 
 @group(1)
@@ -51,5 +52,4 @@ fn cropped_coords(normalized: vec2<f32>) -> vec2<i32> {
     let sample_x = normalized.x * (uniforms.image_size.x - right - left) + left;
     let sample_y = normalized.y * (uniforms.image_size.y - top - bottom) + top;
     return vec2<i32>(i32(sample_x), i32(sample_y));
-
 }

@@ -1,31 +1,25 @@
 use image::GenericImageView;
 
-use crate::{program, util::Resize};
+use crate::{program, renderer::ComputeShaderData, util::Resize};
 
 pub mod demosaic;
 pub mod downsample;
 pub mod fragment;
 pub mod processing;
 
-pub fn enqueue_workload(
-    encoder: &mut wgpu::CommandEncoder,
-    compute_pipeline: &wgpu::ComputePipeline,
-    bind_group: &wgpu::BindGroup,
-    uniform_bind_group: &wgpu::BindGroup,
-    size: iced::Size<u32>,
-) {
+pub fn enqueue_workload(encoder: &mut wgpu::CommandEncoder, shader: &ComputeShaderData) {
     {
         let mut cpass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
             label: Some("compute_pass"),
             timestamp_writes: None,
         });
-        cpass.set_pipeline(compute_pipeline);
-        cpass.set_bind_group(0, bind_group, &[]);
-        cpass.set_bind_group(1, uniform_bind_group, &[]);
+        cpass.set_pipeline(&shader.pipeline);
+        cpass.set_bind_group(0, &shader.bind_group, &[]);
+        cpass.set_bind_group(1, &shader.uniform_bind_group, &[]);
         cpass.insert_debug_marker("Dispatching compute shader");
         let workgroup_size = 16;
-        let dispatch_x = size.width.div_ceil(workgroup_size);
-        let dispatch_y = size.height.div_ceil(workgroup_size);
+        let dispatch_x = shader.size.width.div_ceil(workgroup_size);
+        let dispatch_y = shader.size.height.div_ceil(workgroup_size);
         cpass.dispatch_workgroups(dispatch_x, dispatch_y, 1); // Number of cells to run, the (x,y,z) size of item being processed
     }
 }

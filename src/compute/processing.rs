@@ -22,6 +22,7 @@ impl ProcessingShader {
             pipeline,
             bind_group,
             uniform_bind_group,
+            size: textures.output_size,
         }
     }
     pub fn create_pipeline(device: &wgpu::Device) -> wgpu::ComputePipeline {

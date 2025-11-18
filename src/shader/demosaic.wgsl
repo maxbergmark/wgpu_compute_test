@@ -17,7 +17,9 @@ struct Uniforms {
     image_size: vec2<f32>,
     output_size: vec2<f32>,
     scroll_delta: f32,
-    _padding: vec3<f32>,
+    exposure: f32,
+    contrast: f32,
+    // _padding: vec3<f32>,
 };
 
 @group(1)
@@ -44,13 +46,29 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     color = clamp(color, vec4<f32>(0.0), uniforms.whitelevels);
     color -= uniforms.blacklevels;
     color = max(color, vec4<f32>(0.0));
-    let xyz = color.rgba * uniforms.cam_2_xyz;
+    var xyz = color.rgba * uniforms.cam_2_xyz;
+    xyz *= pow(2.0, uniforms.exposure);
+    xyz = contrast(xyz, uniforms.contrast);
+
     var srgb_linear = uniforms.xyz_2_srgb * xyz.rgb;
     let srgb_gamma = gamma(srgb_linear);
 
     textureStore(output, coords, vec4<f32>(srgb_gamma, 1.0));
-
 }
+
+fn contrast(v: vec3<f32>, value: f32) -> vec3<f32> {
+    return vec3<f32>(
+        map_contrast(v.r, value),
+        map_contrast(v.g, value),
+        map_contrast(v.b, value)
+    );
+}
+
+fn map_contrast(channel: f32, value: f32) -> f32 {
+    let factor = (259.0 * (value + 255.0)) / (255.0 * (259.0 - value));
+    return factor * (channel - 0.5) + 0.5;
+}
+
 
 fn gamma(v: vec3<f32>) -> vec3<f32> {
     return vec3<f32>(
@@ -78,15 +96,15 @@ fn load1(p: vec2<i32>) -> f32 {
 fn avg_cross(p: vec2<i32>, size: vec2<i32>, center: f32) -> f32 {
     var sum: f32 = 0.0;
     var n: i32 = 0;
-    let L = p + vec2<i32>(-1,  0);
-    let R = p + vec2<i32>( 1,  0);
-    let U = p + vec2<i32>( 0, -1);
-    let D = p + vec2<i32>( 0,  1);
-    if (in_bounds(L, size)) { sum += load1(L); n += 1; }
-    if (in_bounds(R, size)) { sum += load1(R); n += 1; }
-    if (in_bounds(U, size)) { sum += load1(U); n += 1; }
-    if (in_bounds(D, size)) { sum += load1(D); n += 1; }
-    if (n == 0) { return center; }
+    let L = p + vec2<i32>(-1, 0);
+    let R = p + vec2<i32>(1, 0);
+    let U = p + vec2<i32>(0, -1);
+    let D = p + vec2<i32>(0, 1);
+    if in_bounds(L, size) { sum += load1(L); n += 1; }
+    if in_bounds(R, size) { sum += load1(R); n += 1; }
+    if in_bounds(U, size) { sum += load1(U); n += 1; }
+    if in_bounds(D, size) { sum += load1(D); n += 1; }
+    if n == 0 { return center; }
     return sum / f32(n);
 }
 
@@ -94,14 +112,14 @@ fn avg_diag(p: vec2<i32>, size: vec2<i32>, center: f32) -> f32 {
     var sum: f32 = 0.0;
     var n: i32 = 0;
     let UL = p + vec2<i32>(-1, -1);
-    let UR = p + vec2<i32>( 1, -1);
-    let DL = p + vec2<i32>(-1,  1);
-    let DR = p + vec2<i32>( 1,  1);
-    if (in_bounds(UL, size)) { sum += load1(UL); n += 1; }
-    if (in_bounds(UR, size)) { sum += load1(UR); n += 1; }
-    if (in_bounds(DL, size)) { sum += load1(DL); n += 1; }
-    if (in_bounds(DR, size)) { sum += load1(DR); n += 1; }
-    if (n == 0) { return center; }
+    let UR = p + vec2<i32>(1, -1);
+    let DL = p + vec2<i32>(-1, 1);
+    let DR = p + vec2<i32>(1, 1);
+    if in_bounds(UL, size) { sum += load1(UL); n += 1; }
+    if in_bounds(UR, size) { sum += load1(UR); n += 1; }
+    if in_bounds(DL, size) { sum += load1(DL); n += 1; }
+    if in_bounds(DR, size) { sum += load1(DR); n += 1; }
+    if n == 0 { return center; }
     return sum / f32(n);
 }
 
@@ -109,10 +127,10 @@ fn avg_lr(p: vec2<i32>, size: vec2<i32>, center: f32) -> f32 {
     var sum: f32 = 0.0;
     var n: i32 = 0;
     let L = p + vec2<i32>(-1, 0);
-    let R = p + vec2<i32>( 1, 0);
-    if (in_bounds(L, size)) { sum += load1(L); n += 1; }
-    if (in_bounds(R, size)) { sum += load1(R); n += 1; }
-    if (n == 0) { return center; }
+    let R = p + vec2<i32>(1, 0);
+    if in_bounds(L, size) { sum += load1(L); n += 1; }
+    if in_bounds(R, size) { sum += load1(R); n += 1; }
+    if n == 0 { return center; }
     return sum / f32(n);
 }
 
@@ -120,10 +138,10 @@ fn avg_ud(p: vec2<i32>, size: vec2<i32>, center: f32) -> f32 {
     var sum: f32 = 0.0;
     var n: i32 = 0;
     let U = p + vec2<i32>(0, -1);
-    let D = p + vec2<i32>(0,  1);
-    if (in_bounds(U, size)) { sum += load1(U); n += 1; }
-    if (in_bounds(D, size)) { sum += load1(D); n += 1; }
-    if (n == 0) { return center; }
+    let D = p + vec2<i32>(0, 1);
+    if in_bounds(U, size) { sum += load1(U); n += 1; }
+    if in_bounds(D, size) { sum += load1(D); n += 1; }
+    if n == 0 { return center; }
     return sum / f32(n);
 }
 
@@ -139,8 +157,8 @@ fn demosaic(coords: vec2<i32>) -> vec4<f32> {
     var g: f32 = 0.0;
     var b: f32 = 0.0;
 
-    if (y % 2 == 0) {
-        if (x % 2 == 0) {
+    if y % 2 == 0 {
+        if x % 2 == 0 {
             // R location
             r = c;
             g = avg_cross(p, size, c);
@@ -152,7 +170,7 @@ fn demosaic(coords: vec2<i32>) -> vec4<f32> {
             b = avg_ud(p, size, c);
         }
     } else {
-        if (x % 2 == 0) {
+        if x % 2 == 0 {
             // G on B row
             r = avg_ud(p, size, c);
             g = c;
