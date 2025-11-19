@@ -4,7 +4,7 @@ var image: texture_2d<f32>;
 
 @group(0)
 @binding(1)
-var output: texture_storage_2d<rgba8unorm, write>;
+var output: texture_storage_2d<rgba32float, write>;
 
 struct Uniforms {
     cam_2_xyz: mat3x4<f32>,
@@ -25,7 +25,6 @@ struct Uniforms {
 @group(1)
 @binding(0)
 var<uniform> uniforms: Uniforms;
-
 
 @compute
 @workgroup_size(16, 16)

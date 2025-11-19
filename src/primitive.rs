@@ -37,8 +37,18 @@ impl Primitive {
         {
             timed("Recreating buffers", || {
                 self.recreate_buffers(renderer, device, queue);
+                self.run_demosaic(device, queue, renderer);
             });
         }
+    }
+
+    fn run_demosaic(&self, device: &wgpu::Device, queue: &wgpu::Queue, renderer: &ComputeRenderer) {
+        let mut encoder = device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("primitive.recreate_buffers.encoder"),
+        });
+        renderer.copy_uniforms_to_device(queue, &self.uniforms);
+        compute::enqueue_workload(&mut encoder, &renderer.demosaic_shader);
+        queue.submit(Some(encoder.finish()));
     }
 
     fn recreate_buffers(
@@ -107,7 +117,7 @@ impl iced::widget::shader::Primitive for Primitive {
         let downsample_shader = DownsampleShader::compile(device, &uniforms, &textures);
         let processing_shader = ProcessingShader::compile(device, &uniforms, &textures);
 
-        ComputeRenderer {
+        let renderer = ComputeRenderer {
             fragment_shader,
             uniforms,
             demosaic_shader,
@@ -115,7 +125,9 @@ impl iced::widget::shader::Primitive for Primitive {
             processing_shader,
             image_path: self.image_path.clone(),
             textures,
-        }
+        };
+        self.run_demosaic(device, queue, &renderer);
+        renderer
     }
 
     fn prepare(
@@ -141,7 +153,7 @@ impl iced::widget::shader::Primitive for Primitive {
         target: &wgpu::TextureView,
         bounds: &iced::Rectangle<u32>,
     ) {
-        compute::enqueue_workload(encoder, &renderer.demosaic_shader);
+        // compute::enqueue_workload(encoder, &renderer.demosaic_shader);
         compute::enqueue_workload(encoder, &renderer.downsample_shader);
         compute::enqueue_workload(encoder, &renderer.processing_shader);
         enqueue_draw(renderer, encoder, target, bounds);

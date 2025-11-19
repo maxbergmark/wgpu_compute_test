@@ -78,14 +78,7 @@ impl Ui {
     pub fn footer_view(&self) -> Element<'_, Message> {
         iced::widget::container(
             iced::widget::row![
-                iced::widget::button("IMG_6637.CR2")
-                    .on_press(Message::LoadImage("assets/IMG_6637.CR2".into())),
-                iced::widget::button("IMG_6647.CR2")
-                    .on_press(Message::LoadImage("assets/IMG_6647.CR2".into())),
-                iced::widget::button("IMG_6655.CR2")
-                    .on_press(Message::LoadImage("assets/IMG_6655.CR2".into())),
-                iced::widget::button("IMG_7388.CR2")
-                    .on_press(Message::LoadImage("assets/IMG_7388.CR2".into())),
+                Self::image_buttons(),
                 iced::widget::text(format!(
                     "Image size: {}x{}, Window size: {}x{}\nUpdate time: {:.2?}",
                     self.program.image_size.width,
@@ -107,6 +100,50 @@ impl Ui {
         })
         .into()
     }
+
+    fn image_buttons<'a>() -> Option<Element<'a, Message>> {
+        Some(
+            iced::widget::container(
+                // list files in assets/ directory with .jpg or .CR2 extension
+                iced::widget::row(
+                    std::fs::read_dir("assets/")
+                        .ok()?
+                        .filter_map(std::result::Result::ok)
+                        .filter(|entry| {
+                            entry
+                                .path()
+                                .extension()
+                                .and_then(|ext| ext.to_str())
+                                .is_some_and(|ext| {
+                                    ext.eq_ignore_ascii_case("jpg")
+                                        || ext.eq_ignore_ascii_case("cr2")
+                                })
+                        })
+                        .map(|entry| {
+                            let path = entry.path();
+                            let file_name = path.file_name().and_then(|n| n.to_str()).map_or_else(
+                                || "Unknown".to_string(),
+                                std::string::ToString::to_string,
+                            );
+                            iced::widget::button::Button::new(iced::widget::text(file_name))
+                                .on_press(Message::LoadImage(path))
+                                .into()
+                        }),
+                ),
+            )
+            .into(),
+        )
+    }
+
+    /*                iced::widget::button("IMG_6637.CR2")
+                       .on_press(Message::LoadImage("assets/IMG_6637.CR2".into())),
+                   iced::widget::button("IMG_6647.CR2")
+                       .on_press(Message::LoadImage("assets/IMG_6647.CR2".into())),
+                   iced::widget::button("IMG_6655.CR2")
+                       .on_press(Message::LoadImage("assets/IMG_6655.CR2".into())),
+                   iced::widget::button("IMG_7388.CR2")
+                       .on_press(Message::LoadImage("assets/IMG_7388.CR2".into())),
+    */
 
     fn style(theme: &iced::Theme) -> iced::widget::container::Style {
         match theme {
@@ -165,12 +202,12 @@ impl Ui {
             match extension {
                 "cr2" | "CR2" => {
                     if let Err(e) = self.program.load_cr2_image(path) {
-                        error!("Error loading CR2 image: {}", e);
+                        error!("Error loading CR2 image from {path:?}: {e}");
                     }
                 }
                 "jpg" | "JPG" => {
                     if let Err(e) = self.program.load_image(path) {
-                        error!("Error loading image: {}", e);
+                        error!("Error loading image from {path:?}: {e}");
                     }
                 }
                 _ => {

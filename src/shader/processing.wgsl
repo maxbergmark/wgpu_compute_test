@@ -4,7 +4,7 @@ var image: texture_2d<f32>;
 
 @group(0)
 @binding(1)
-var output: texture_storage_2d<rgba8unorm, write>;
+var output: texture_storage_2d<rgba32float, write>;
 
 struct Uniforms {
     cam_2_xyz: mat3x4<f32>,
@@ -38,23 +38,51 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     }
 
     var color = textureLoad(image, coords, 0);
-    color.a = calculate_opacity(coords);
-    textureStore(output, coords, color);
+    if uniforms.xyz_2_srgb[0].x == 1.0 {
+        textureStore(output, coords, color);
+        return;
+    }
+
+    color = clamp(color, vec4<f32>(0.0), uniforms.whitelevels);
+    color -= uniforms.blacklevels;
+    color = max(color, vec4<f32>(0.0));
+    var xyz = color.rgba * uniforms.cam_2_xyz;
+    xyz *= pow(2.0, uniforms.exposure);
+    xyz = contrast(xyz, uniforms.contrast);
+
+    var srgb_linear = uniforms.xyz_2_srgb * xyz.rgb;
+    let srgb_gamma = gamma(srgb_linear);
+
+    textureStore(output, coords, vec4<f32>(srgb_gamma, 1.0));
+    // textureStore(output, coords, color);
 }
 
-fn calculate_opacity(coords: vec2<i32>) -> f32 {
-    let p = vec2<f32>(coords);
-    let radius = 50.0;
-    let picture_half_size = vec2<f32>(uniforms.output_size.xy) * 0.5;
-    let min_offset = calculate_rounded_offset((p - picture_half_size), picture_half_size - radius, radius);
-    return 1.0 - smoothstep(0.0, radius, min_offset);
+fn contrast(v: vec3<f32>, value: f32) -> vec3<f32> {
+    return vec3<f32>(
+        map_contrast(v.r, value),
+        map_contrast(v.g, value),
+        map_contrast(v.b, value)
+    );
 }
 
-fn calculate_rounded_offset(
-    p: vec2<f32>,
-    picture_half_size: vec2<f32>,
-    corner_radius: f32
-) -> f32 {
-    let d = abs(p) - (picture_half_size - vec2<f32>(corner_radius));
-    return length(max(d, vec2<f32>(0.0))) - corner_radius;
+fn map_contrast(channel: f32, value: f32) -> f32 {
+    let factor = (259.0 * (value + 255.0)) / (255.0 * (259.0 - value));
+    return factor * (channel - 0.5) + 0.5;
+}
+
+
+fn gamma(v: vec3<f32>) -> vec3<f32> {
+    return vec3<f32>(
+        gamma_correct(v.r),
+        gamma_correct(v.g),
+        gamma_correct(v.b)
+    );
+}
+
+fn gamma_correct(v: f32) -> f32 {
+    if v <= 0.0031308 {
+        return 12.92 * v;
+    } else {
+        return 1.055 * pow(v, 1.0 / 2.4) - 0.055;
+    }
 }

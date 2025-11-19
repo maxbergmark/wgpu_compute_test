@@ -1,8 +1,12 @@
 use std::path::PathBuf;
 
-use crate::compute::{
-    demosaic::DemosaicShader, downsample::DownsampleShader, fragment::FragmentShader,
-    processing::ProcessingShader,
+use crate::{
+    compute::{
+        demosaic::DemosaicShader, downsample::DownsampleShader, fragment::FragmentShader,
+        processing::ProcessingShader,
+    },
+    uniforms::Uniforms,
+    util::Tof32,
 };
 
 pub struct ComputeRenderer {
@@ -77,5 +81,13 @@ impl ComputeRenderer {
         self.processing_shader.size = self.textures.output_size;
         self.downsample_shader.size = self.textures.output_size;
         self.demosaic_shader.size = self.textures.image_size;
+    }
+
+    pub fn copy_uniforms_to_device(&self, queue: &wgpu::Queue, uniforms: &Uniforms) {
+        queue.write_buffer(
+            &self.uniforms,
+            0,
+            bytemuck::bytes_of(&uniforms.to_raw(self.textures.output_size.to_f32())),
+        );
     }
 }

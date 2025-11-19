@@ -67,11 +67,11 @@ pub fn create_texture(device: &wgpu::Device, image: &image::DynamicImage) -> wgp
         mip_level_count: 1,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rgba8Unorm,
+        format: wgpu::TextureFormat::Rgba32Float,
         usage: wgpu::TextureUsages::STORAGE_BINDING
             | wgpu::TextureUsages::COPY_DST
             | wgpu::TextureUsages::TEXTURE_BINDING,
-        view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
+        view_formats: &[wgpu::TextureFormat::Rgba32Float],
     })
 }
 
@@ -114,11 +114,11 @@ pub fn create_window_texture(
         mip_level_count: 1,
         sample_count: 1,
         dimension: wgpu::TextureDimension::D2,
-        format: wgpu::TextureFormat::Rgba8Unorm,
+        format: wgpu::TextureFormat::Rgba32Float,
         usage: wgpu::TextureUsages::STORAGE_BINDING
             | wgpu::TextureUsages::COPY_DST
             | wgpu::TextureUsages::TEXTURE_BINDING,
-        view_formats: &[wgpu::TextureFormat::Rgba8Unorm],
+        view_formats: &[wgpu::TextureFormat::Rgba32Float],
     })
 }
 
@@ -140,20 +140,26 @@ pub fn to_texture_view(texture: &wgpu::Texture) -> wgpu::TextureView {
 pub fn write_texture(queue: &wgpu::Queue, texture: &wgpu::Texture, image: &program::Image) {
     let (width, height) = image.dimensions();
     let data: Vec<u8> = match image {
-        program::Image::DynamicImage(img) => img.to_rgba8().into_raw(),
+        program::Image::DynamicImage(img) => bytemuck::cast_slice(
+            &img.to_rgba8()
+                .iter()
+                .map(|v| f32::from(*v) / 255.0)
+                .collect::<Vec<f32>>(),
+        )
+        .to_vec(),
         program::Image::RawImage(raw) => match &raw.data {
-            rawloader::RawImageData::Integer(items) => bytemuck::cast_slice(
-                &items
-                    .iter()
-                    .copied()
-                    .map(f32::from)
-                    // .flat_map(|v| [v, v, v, v])
-                    .collect::<Vec<f32>>(),
-            )
-            .to_vec(),
+            rawloader::RawImageData::Integer(items) => {
+                bytemuck::cast_slice(&items.iter().copied().map(f32::from).collect::<Vec<f32>>())
+                    .to_vec()
+            }
             #[allow(clippy::panic)]
             rawloader::RawImageData::Float(_) => panic!("Not supported"),
         },
+    };
+
+    let bytes_per_pixel = match image {
+        program::Image::DynamicImage(_) => 16, // RGBA32Float
+        program::Image::RawImage(_) => 4,      // R32Float
     };
 
     // info!("Writing texture of size {}x{}", width, height);
@@ -171,7 +177,7 @@ pub fn write_texture(queue: &wgpu::Queue, texture: &wgpu::Texture, image: &progr
         &data,
         wgpu::TexelCopyBufferLayout {
             offset: 0,
-            bytes_per_row: Some(4 * width),
+            bytes_per_row: Some(bytes_per_pixel * width),
             rows_per_image: Some(height),
         },
         wgpu::Extent3d {
@@ -188,8 +194,8 @@ pub fn create_sampler(device: &wgpu::Device) -> wgpu::Sampler {
         address_mode_u: wgpu::AddressMode::ClampToEdge,
         address_mode_v: wgpu::AddressMode::ClampToEdge,
         address_mode_w: wgpu::AddressMode::ClampToEdge,
-        mag_filter: wgpu::FilterMode::Linear,
-        min_filter: wgpu::FilterMode::Linear,
+        mag_filter: wgpu::FilterMode::Nearest,
+        min_filter: wgpu::FilterMode::Nearest,
         mipmap_filter: wgpu::FilterMode::Nearest,
         ..Default::default()
     })

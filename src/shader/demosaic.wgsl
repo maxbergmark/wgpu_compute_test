@@ -36,55 +36,17 @@ fn main(@builtin(global_invocation_id) global_id: vec3<u32>) {
     }
 
     if uniforms.xyz_2_srgb[0].x == 1.0 {
-        // Identity matrix, skip processing
         let color = textureLoad(image, coords, 0);
         textureStore(output, coords, color);
         return;
     }
 
+
     var color = demosaic(coords);
-    color = clamp(color, vec4<f32>(0.0), uniforms.whitelevels);
-    color -= uniforms.blacklevels;
-    color = max(color, vec4<f32>(0.0));
-    var xyz = color.rgba * uniforms.cam_2_xyz;
-    xyz *= pow(2.0, uniforms.exposure);
-    xyz = contrast(xyz, uniforms.contrast);
-
-    var srgb_linear = uniforms.xyz_2_srgb * xyz.rgb;
-    let srgb_gamma = gamma(srgb_linear);
-
-    textureStore(output, coords, vec4<f32>(srgb_gamma, 1.0));
-}
-
-fn contrast(v: vec3<f32>, value: f32) -> vec3<f32> {
-    return vec3<f32>(
-        map_contrast(v.r, value),
-        map_contrast(v.g, value),
-        map_contrast(v.b, value)
-    );
-}
-
-fn map_contrast(channel: f32, value: f32) -> f32 {
-    let factor = (259.0 * (value + 255.0)) / (255.0 * (259.0 - value));
-    return factor * (channel - 0.5) + 0.5;
+    textureStore(output, coords, color);
 }
 
 
-fn gamma(v: vec3<f32>) -> vec3<f32> {
-    return vec3<f32>(
-        gamma_correct(v.r),
-        gamma_correct(v.g),
-        gamma_correct(v.b)
-    );
-}
-
-fn gamma_correct(v: f32) -> f32 {
-    if v <= 0.0031308 {
-        return 12.92 * v;
-    } else {
-        return 1.055 * pow(v, 1.0 / 2.4) - 0.055;
-    }
-}
 fn in_bounds(p: vec2<i32>, size: vec2<i32>) -> bool {
     return p.x >= 0 && p.y >= 0 && p.x < size.x && p.y < size.y;
 }
